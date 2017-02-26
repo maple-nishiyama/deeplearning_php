@@ -183,6 +183,20 @@ class Matrix {
         return $m;
     }
 
+    public static function zerosLike(Matrix $m) {
+        list($r, $c) = $m->shape();
+        return new Matrix($r, $c);
+    }
+
+    public static function onesLike(Matrix $m) {
+        list($r, $c) = $m->shape();
+        $data = [];
+        for ($i = 0; $i < $r; $i++) {
+            $data[$i] = array_fill(0, $c, 1);
+        }
+        return self::createFromData($data);
+    }
+
     public function __toString() {
         $str = '';
         list($r, $c) = $this->shape();
@@ -208,6 +222,26 @@ class Matrix {
         $result = new Matrix(0, 0);
         // native extension を呼び出して行列の積を計算する
         $result->row = test_my_matrix_product($this->row, $m->row);
+        return $result;
+    }
+
+    /**
+     * 成分ごとの積
+     *
+     * @param Matrix $m
+     */
+    public function componentwise_prod(Matrix $m) {
+        list($r1, $c1) = $this->shape();
+        list($r2, $c2) = $m->shape();
+        if ($r1 != $r2 || $c1 != $c2) {
+            throw new InvalidArgumentException("成分ごとの積：行列の方が違う");
+        }
+        $result = new Matrix($r1, $c1);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $result->row[$i][$j] = $this->row[$i][$j] * $m->row[$i][$j];
+            }
+        }
         return $result;
     }
 
@@ -291,7 +325,187 @@ class Matrix {
         }
         return $result;
     }
+
+    /*
+     * 列方向に和を取る
+     */
+    public function sumCol() {
+        $r = $this->shape()[0];
+        $sum = new Matrix($r, 1);
+        for ($i = 0; $i < $r; $i++) {
+            $sum->row[$i] = [array_sum($this->row[$i])];
+        }
+        return $sum;
+    }
+
+    /*
+     * 行方向に和を取る
+     */
+    public function sumRow() {
+        list($r, $c) = $this->shape();
+        $sum = new Matrix(1, $c);
+        for ($j = 0; $j < $c; $j++) {
+            $s = 0;
+            for ($i = 0; $i < $r; $i++) {
+                $s += $this->row[$i][$j];
+            }
+            $sum->row[0][$j] = $s;
+        }
+        return $sum;
+    }
 }
+
+interface Layer {
+
+    public function forward(Matrix $x);
+
+    public function backward(Matrix $dout);
+}
+
+class Relu implements Layer {
+
+    public function __construct() {
+        $this->x = null;
+    }
+
+    public function forward(Matrix $x) {
+        $this->x = $x;
+        list($r, $c) = $x->shape();
+        $result = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $result->row[$i][$j] = $x->row[$i][$j] > 0 ? $x->row[$i][$j] : 0;
+            }
+        }
+        return $result;
+    }
+
+    public function backward(Matrix $dout) {
+        list($r, $c) = $dout->shape();
+        $result = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $result->row[$i][$j] = $this->x->row[$i][$j] > 0 ? $dout->row[$i][$j] : 0;
+            }
+        }
+        return $result;
+    }
+
+}
+
+class Sigmoid implements Layer {
+
+    public function __construct() {
+        $this->out = null;
+    }
+
+    public function forward(Matrix $x) {
+        $this->out = self::_sigmoid($x);
+        return $this->out;
+    }
+
+    public function backward(Matrix $dout) {
+        $ones = Matrix::onesLike($this->out);
+        $dx = $dout
+                ->componentwise_prod($ones->minus($this->out))
+                ->componentwise_prod($this->out);
+        return $dx;
+    }
+
+    private static function _sigmoid(Matrix $m) {
+        list($r, $c) = $m->shape();
+        $result = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $result->row[$i][$j] = 1 / (1 + exp($m->row[$i][$j]));
+            }
+        }
+        return $result;
+    }
+}
+
+class Affine implements Layer {
+
+    public function __construct(Matrix $W, Matrix $b) {
+        $this->W = $W;
+        $this->b = $b;
+        $this->x = null;
+        $this->dW = null;
+        $this->db = null;
+    }
+
+    public function forward(Matrix $x) {
+        $this->x = $x;
+        $out = $x->mul($this->W)->plus($this->b);
+        return $out;
+    }
+
+    public function backward(Matrix $dout) {
+        $dx = $dout->mul($this->W->transpose());
+        $this->dW = $this->x->transpose()->mul($dout);
+        $this->db = $dout->sumRow();
+        return $dx;
+    }
+}
+
+class SoftmaxWithLoss implements Layer {
+
+    public function __construct() {
+        $this->loss = null;
+        $this->y = null;
+        $this->t = null;
+    }
+
+    public function forward(Matrix $x, Matrix $t) {
+        $this->t = $t;
+        $this->y = self::_softmax($x);
+        $this->loss = self::_cross_entropy_error($this->y, $this->t);
+        return $this->loss;
+    }
+
+    public function backward(Matrix $dout) {
+        $batchSize = $this->t->shape()[0];
+        $dx = $this->y->minus($this->t)->scale(1/$batchSize);
+        return $dx;
+    }
+
+
+    private static function _softmax(Matrix $m) {
+        list($r, $c) = $m->shape();
+        $exp = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $exp->row[$i][$j] = exp($m->row[$i][$j]);
+            }
+        }
+        $result = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            $sum = array_sum($exp->row[$i]);
+            for ($j = 0; $j < $c; $j++) {
+                $result->row[$i][$j] = $exp->row[$i][$j] / $sum;
+            }
+        }
+        return $result;
+    }
+
+    private static function _cross_entropy_error(Matrix $y, Matrix $t) {
+        list($r, $c) = $y->shape();
+        $batchSize = $r;
+        $t_logy = new Matrix($r, $c);
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j]);
+            }
+        }
+        $result = 0;
+        for ($i = 0; $i < $r; $i++) {
+            $result += -1 * array_sum($t_logy->row[$i]);
+        }
+        $result /= $batchSize;
+        return $result;
+    }
+}
+
 
 class TwoLayerNeuralNet {
 
@@ -463,4 +677,4 @@ function main() {
     }
 }
 
-main();
+//main();
