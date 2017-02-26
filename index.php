@@ -170,12 +170,31 @@ class Matrix {
 
     public $row = null;
 
-    public function __construct($numRow, $numCol) {
+    public function __construct($numRow = 0, $numCol = 0) {
         $this->row = [];
         for ($i = 0; $i < $numRow; $i++) {
             $this->row[$i] = array_fill(0, $numCol, 0);
         }
     }
+
+    public static function createFromData(array $data) {
+        $m = new Matrix();
+        $m->row = $data;
+        return $m;
+    }
+
+    public function __toString() {
+        $str = '';
+        list($r, $c) = $this->shape();
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $str .= '  ' . $this->row[$i][$j];
+            }
+            $str .= "\n";
+        }
+        return $str;
+    }
+
     public function shape() {
         return [count($this->row), count($this->row[0])];
     }
@@ -187,15 +206,7 @@ class Matrix {
             throw new InvalidArgumentException("行列の型が違う");
         }
         $result = new Matrix(0, 0);
-        /*
-        for ($i = 0; $i < $r1; $i++) {
-            for ($j = 0; $j < $c2; $j++) {
-                for ($k = 0; $k < $c1; $k++) {
-                    $result->row[$i][$j] += $this->row[$i][$k] * $m->row[$k][$j];
-                }
-            }
-        }
-         */
+        // native extension を呼び出して行列の積を計算する
         $result->row = test_my_matrix_product($this->row, $m->row);
         return $result;
     }
@@ -206,10 +217,11 @@ class Matrix {
         if ($s1 != $s2) {
             if ($s2[0] === 1) {
                 // ブロードキャストを試みる
-                $m = new Matrix($s1[0], $s1[1]);
+                $m_ = new Matrix($s1[0], $s1[1]);
                 for ($i = 0; $i < $s1[0]; $i++) {
-                    $m->row[$i] = $m->row[0];
+                    $m_->row[$i] = $m->row[0];
                 }
+                $m = $m_;
             } else {
                 throw new InvalidArgumentException("行列の型が違う");
             }
