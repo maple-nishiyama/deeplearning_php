@@ -186,7 +186,8 @@ class Matrix {
         if($c1 !== $r2) {
             throw new InvalidArgumentException("行列の型が違う");
         }
-        $result = new Matrix($r1, $c2);
+        $result = new Matrix(0, 0);
+        /*
         for ($i = 0; $i < $r1; $i++) {
             for ($j = 0; $j < $c2; $j++) {
                 for ($k = 0; $k < $c1; $k++) {
@@ -194,6 +195,8 @@ class Matrix {
                 }
             }
         }
+         */
+        $result->row = test_my_matrix_product($this->row, $m->row);
         return $result;
     }
 
@@ -280,7 +283,7 @@ class Matrix {
 
 class TwoLayerNeuralNet {
 
-    private $params = [];
+    public $params = [];
 
     public function __construct($inputSize, $hiddenSize, $outputSize, $weightInitStd=0.01) {
         $this->params = [];
@@ -291,8 +294,6 @@ class TwoLayerNeuralNet {
     }
 
     public function predict(Matrix $x) {
-        static $i = 0;
-        echo "predict $i begin.\n";
         $W1 = $this->params['W1'];
         $W2 = $this->params['W2'];
         $b1 = $this->params['b1'];
@@ -304,8 +305,6 @@ class TwoLayerNeuralNet {
         $a2 = $z1->mul($W2)->plus($b2);
         unset($z1);
         $y = self::_softmax($a2);
-        echo "predict $i finished.\n";
-        $i++;
         return $y;
     }
 
@@ -433,7 +432,7 @@ function main() {
     Util::loadData();
     $network = new TwoLayerNeuralNet($inputSize=784, $hiddenSize=10, $outputSize=10);
 
-    for ($i = 0; $i < 1; $i++) {
+    for ($i = 0; $i < $itersNum; $i++) {
         // ミニバッチの取得
         $batchMask = Util::randoms($trainSize, $batchSize);
         list($xBatch, $tBatch) = Util::getTrainBatch($batchMask);
@@ -442,7 +441,7 @@ function main() {
         $grad = $network->numericalGradient($xBatch, $tBatch);
 
         foreach (['W1', 'b1', 'W2', 'b2'] as $key) {
-            $network->params[$key] -= $learningRate * $grad[$key];
+            $network->params[$key] = $network->params[$key]->plus($grad[$key]->scale(-$learningRate));
         }
 
         $loss = $network->loss($xBatch, $tBatch);
