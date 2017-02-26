@@ -399,7 +399,7 @@ class Sigmoid implements Layer {
         $this->out = null;
     }
 
-    public function forward(Matrix $x) {
+    public function forward(Matrix $x, Matrix $t = null) {
         $this->out = self::_sigmoid($x);
         return $this->out;
     }
@@ -456,7 +456,7 @@ class SoftmaxWithLoss implements Layer {
         $this->t = null;
     }
 
-    public function forward(Matrix $x, Matrix $t) {
+    public function forward(Matrix $x, Matrix $t = null) {
         $this->t = $t;
         $this->y = self::_softmax($x);
         $this->loss = self::_cross_entropy_error($this->y, $this->t);
@@ -511,32 +511,33 @@ class TwoLayerNeuralNet {
 
     public $params = [];
 
+    public $layers = [];
+
     public function __construct($inputSize, $hiddenSize, $outputSize, $weightInitStd=0.01) {
         $this->params = [];
         $this->params['W1'] = (new Matrix($inputSize, $hiddenSize))->randomize();
         $this->params['b1'] = new Matrix(1, $hiddenSize);
         $this->params['W2'] = (new Matrix($hiddenSize, $outputSize))->randomize();
         $this->params['b2'] = new Matrix(1, $outputSize);
+
+        // レイヤーの生成
+        $this->layers = [];
+        $this->layers['Affine1'] = new Affine($this->params['W1'], $this->params['b1']);
+        $this->layers['Relu1'] = new Relu();
+        $this->layers['Affine2'] = new Affine($this->params['W2'], $this->params['b1']);
+        $this->lastLayer = new SoftmaxWithLoss();
     }
 
     public function predict(Matrix $x) {
-        $W1 = $this->params['W1'];
-        $W2 = $this->params['W2'];
-        $b1 = $this->params['b1'];
-        $b2 = $this->params['b2'];
-
-        $a1 = $x->mul($W1)->plus($b1);
-        $z1 = self::_sigmoid($a1);
-        unset($a1);
-        $a2 = $z1->mul($W2)->plus($b2);
-        unset($z1);
-        $y = self::_softmax($a2);
-        return $y;
+        foreach($this->layers as $layer) {
+            $x = $layer->forward($x);
+        }
+        return $x;
     }
 
     public function loss(Matrix $x, Matrix $t) {
         $y = $this->predict($x);
-        return self::_cross_entropy_error($y, $t);
+        return $this->lastLayer->forward($y, $t);
     }
 
     public function accuracy(Matrix $x, Matrix $t) {
@@ -553,6 +554,7 @@ class TwoLayerNeuralNet {
         return $acc / $r;
     }
 
+    // 数値微分
     public function numericalGradient(Matrix $x, Matrix $t) {
         $lossW = function($W) use ($x, $t) { return $this->loss($x, $t); };
         $grads = [];
@@ -589,6 +591,30 @@ class TwoLayerNeuralNet {
         }
 
         return $grad;
+    }
+
+    // 誤差逆伝搬法
+    public function backpropagationGradient(Matrix $x, Matrix $t) {
+
+        // まず一回順伝搬させる
+        $this->loss($x, $t);
+
+        $dout = new Matrix(1, 1);
+        $dout->row[0][0] = 1;
+        $dout = $this->lastLayer->backward($dout);
+
+        $reversedLayers = array_reverse($this->layers);
+        foreach ($reversedLayers as $layer) {
+            $dout = $layer->backward($dout);
+        }
+
+        $grads = [];
+        $grads['W1'] = $this->layers['Affine1']->dW;
+        $grads['b1'] = $this->layers['Affine1']->db;
+        $grads['W2'] = $this->layers['Affine2']->dW;
+        $grads['b2'] = $this->layers['Affine2']->db;
+
+        return $grads;
     }
 
     private static function _sigmoid(Matrix $m) {
@@ -639,14 +665,6 @@ class TwoLayerNeuralNet {
 
 }
 
-/*
-$images = Util::downloadMnist();
-Util::loadData();
-
-$index = $_GET['index'];
-Util::outputTrainImage($index);
- */
-
 function main() {
     $itersNum = 10000;
     $trainSize = 60000;
@@ -656,7 +674,7 @@ function main() {
     $trainLossList = [];
 
     Util::loadData();
-    $network = new TwoLayerNeuralNet($inputSize=784, $hiddenSize=10, $outputSize=10);
+    $network = new TwoLayerNeuralNet($inputSize=784, $hiddenSize=50, $outputSize=10);
 
     for ($i = 0; $i < $itersNum; $i++) {
         // ミニバッチの取得
@@ -664,7 +682,8 @@ function main() {
         list($xBatch, $tBatch) = Util::getTrainBatch($batchMask);
 
         echo "numericalGradient: i = $i\n";
-        $grad = $network->numericalGradient($xBatch, $tBatch);
+        //$grad = $network->numericalGradient($xBatch, $tBatch);
+        $grad = $network->backpropagationGradient($xBatch, $tBatch);
 
         foreach (['W1', 'b1', 'W2', 'b2'] as $key) {
             $network->params[$key] = $network->params[$key]->plus($grad[$key]->scale(-$learningRate));
@@ -677,4 +696,3 @@ function main() {
     }
 }
 
-//main();
