@@ -14,7 +14,7 @@ class Util {
     const MNIST_TRAIN_IMAGE_FILE = 'mnist_train_image';
     const MNIST_TRAIN_LABEL_FILE = 'mnist_train_label';
     const MNIST_TEST_IMAGE_FILE = 'mnist_test_image';
-    const MNIST_TEST_LABEL_FILE = 'mnist_train_image';
+    const MNIST_TEST_LABEL_FILE = 'mnist_test_label';
 
     private static $__mnist_train_image_cache = null;
     private static $__mnist_train_label_cache = null;
@@ -79,7 +79,7 @@ class Util {
         $header = unpack('N2', $label);
         $magic = $header[1];
         $numLabels = $header[2];
-        $label = unpack('C', substr($label, $index + 2, 1));
+        $label = unpack('C', substr($label, $index + 2 * 4, 1));
         if ($onehot) {
             $t = array_fill(0, 10, 0.0);
             $t[$label[1]] = 1.0;
@@ -149,6 +149,11 @@ class Util {
         header("Content-type: image/png");
         $pixels = self::getImageAt(self::$__mnist_train_image_cache, $index);
         self::drawImage($pixels, 28, 28);
+    }
+
+    static function outputTrainLabel($index) {
+        $lb = self::getLabelAt(self::$__mnist_train_label_cache, $index, $onehot = true);
+        return implode(', ', $lb);
     }
 
     /**
@@ -524,7 +529,7 @@ class TwoLayerNeuralNet {
         $this->layers = [];
         $this->layers['Affine1'] = new Affine($this->params['W1'], $this->params['b1']);
         $this->layers['Relu1'] = new Relu();
-        $this->layers['Affine2'] = new Affine($this->params['W2'], $this->params['b1']);
+        $this->layers['Affine2'] = new Affine($this->params['W2'], $this->params['b2']);
         $this->lastLayer = new SoftmaxWithLoss();
     }
 
@@ -665,10 +670,18 @@ class TwoLayerNeuralNet {
 
 }
 
+/*
+$images = Util::downloadMnist();
+Util::loadData();
+
+$index = $_GET['index'];
+Util::outputTrainImage($index);
+ */
+
 function main() {
     $itersNum = 10000;
     $trainSize = 60000;
-    $batchSize = 100;
+    $batchSize = 10;
     $learningRate = 0.1;
 
     $trainLossList = [];
@@ -682,8 +695,8 @@ function main() {
         list($xBatch, $tBatch) = Util::getTrainBatch($batchMask);
 
         echo "numericalGradient: i = $i\n";
-        //$grad = $network->numericalGradient($xBatch, $tBatch);
-        $grad = $network->backpropagationGradient($xBatch, $tBatch);
+        $grad = $network->numericalGradient($xBatch, $tBatch);
+        //$grad = $network->backpropagationGradient($xBatch, $tBatch);
 
         foreach (['W1', 'b1', 'W2', 'b2'] as $key) {
             $network->params[$key] = $network->params[$key]->plus($grad[$key]->scale(-$learningRate));
