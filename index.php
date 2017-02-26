@@ -239,11 +239,11 @@ class Matrix {
         list($r1, $c1) = $this->shape();
         list($r2, $c2) = $m->shape();
         if ($r1 != $r2 || $c1 != $c2) {
-            throw new InvalidArgumentException("成分ごとの積：行列の方が違う");
+            throw new InvalidArgumentException("成分ごとの積：行列の型が違う");
         }
         $result = new Matrix($r1, $c1);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
+        for ($i = 0; $i < $r1; $i++) {
+            for ($j = 0; $j < $c1; $j++) {
                 $result->row[$i][$j] = $this->row[$i][$j] * $m->row[$i][$j];
             }
         }
@@ -319,13 +319,13 @@ class Matrix {
             $tr = $m->transpose();
             for ($i = 0; $i < $c; $i++) {
                 $max = max($tr->row[$i]);
-                $result->row[0][$i] = array_keys($this->row[$i], $max)[0];
+                $result->row[0][$i] = array_keys($tr->row[$i], $max)[0];
             }
         } else {
             $result = new Matrix($r, 1);
             for ($i = 0; $i < $r; $i++) {
                 $max = max($m->row[$i]);
-                $result->row[$i][0] = array_keys($this->row[$i], $max)[0];
+                $result->row[$i][0] = array_keys($m->row[$i], $max)[0];
             }
         }
         return $result;
