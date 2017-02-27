@@ -306,7 +306,7 @@ class Matrix {
         list($r, $c) = $this->shape();
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $this->row[$i][$j] = mt_rand(0, 1E4) / 1E6;
+                $this->row[$i][$j] = mt_rand(0, 1E4) / 3E6;
             }
         }
         return $this;
@@ -463,8 +463,8 @@ class SoftmaxWithLoss implements Layer {
 
     public function forward(Matrix $x, Matrix $t = null) {
         $this->t = $t;
-        $this->y = self::_softmax($x);
-        $this->loss = self::_cross_entropy_error($this->y, $this->t);
+        $this->y = self::softmax($x);
+        $this->loss = self::cross_entropy_error($this->y, $this->t);
         return $this->loss;
     }
 
@@ -475,12 +475,19 @@ class SoftmaxWithLoss implements Layer {
     }
 
 
-    private static function _softmax(Matrix $m) {
+    public static function softmax(Matrix $m) {
         list($r, $c) = $m->shape();
         $exp = new Matrix($r, $c);
+        // 最大値を引き去るために、先に求めておく
+        $max = 0;
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $exp->row[$i][$j] = exp($m->row[$i][$j]);
+                $max = max($max, $m->row[$i][$j]);
+            }
+        }
+        for ($i = 0; $i < $r; $i++) {
+            for ($j = 0; $j < $c; $j++) {
+                $exp->row[$i][$j] = exp($m->row[$i][$j] - $max);
             }
         }
         $result = new Matrix($r, $c);
@@ -493,13 +500,13 @@ class SoftmaxWithLoss implements Layer {
         return $result;
     }
 
-    private static function _cross_entropy_error(Matrix $y, Matrix $t) {
+    public static function cross_entropy_error(Matrix $y, Matrix $t) {
         list($r, $c) = $y->shape();
         $batchSize = $r;
         $t_logy = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j]);
+                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j] + 1E-7);
             }
         }
         $result = 0;
@@ -534,7 +541,7 @@ class TwoLayerNeuralNet {
     }
 
     public function predict(Matrix $x) {
-        foreach($this->layers as $layer) {
+        foreach($this->layers as $key => $layer) {
             $x = $layer->forward($x);
         }
         return $x;
@@ -609,7 +616,7 @@ class TwoLayerNeuralNet {
         $dout = $this->lastLayer->backward($dout);
 
         $reversedLayers = array_reverse($this->layers);
-        foreach ($reversedLayers as $layer) {
+        foreach ($reversedLayers as $key => $layer) {
             $dout = $layer->backward($dout);
         }
 
@@ -621,53 +628,6 @@ class TwoLayerNeuralNet {
 
         return $grads;
     }
-
-    private static function _sigmoid(Matrix $m) {
-        list($r, $c) = $m->shape();
-        $result = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = 1 / (1 + exp($m->row[$i][$j]));
-            }
-        }
-        return $result;
-    }
-
-    private static function _softmax(Matrix $m) {
-        list($r, $c) = $m->shape();
-        $exp = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $exp->row[$i][$j] = exp($m->row[$i][$j]);
-            }
-        }
-        $result = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            $sum = array_sum($exp->row[$i]);
-            for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = $exp->row[$i][$j] / $sum;
-            }
-        }
-        return $result;
-    }
-
-    private static function _cross_entropy_error(Matrix $y, Matrix $t) {
-        list($r, $c) = $y->shape();
-        $batchSize = $r;
-        $t_logy = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j]);
-            }
-        }
-        $result = 0;
-        for ($i = 0; $i < $r; $i++) {
-            $result += -1 * array_sum($t_logy->row[$i]);
-        }
-        $result /= $batchSize;
-        return $result;
-    }
-
 }
 
 /*
@@ -681,7 +641,7 @@ Util::outputTrainImage($index);
 function main() {
     $itersNum = 10000;
     $trainSize = 60000;
-    $batchSize = 10;
+    $batchSize = 100;
     $learningRate = 0.1;
 
     $trainLossList = [];
@@ -694,9 +654,8 @@ function main() {
         $batchMask = Util::randoms($trainSize, $batchSize);
         list($xBatch, $tBatch) = Util::getTrainBatch($batchMask);
 
-        echo "numericalGradient: i = $i\n";
-        $grad = $network->numericalGradient($xBatch, $tBatch);
-        //$grad = $network->backpropagationGradient($xBatch, $tBatch);
+        //$grad = $network->numericalGradient($xBatch, $tBatch);
+        $grad = $network->backpropagationGradient($xBatch, $tBatch);
 
         foreach (['W1', 'b1', 'W2', 'b2'] as $key) {
             $network->params[$key] = $network->params[$key]->plus($grad[$key]->scale(-$learningRate));
@@ -709,3 +668,4 @@ function main() {
     }
 }
 
+main();
