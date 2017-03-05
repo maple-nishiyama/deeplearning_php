@@ -62,7 +62,7 @@ class Util {
         self::$__mnist_test_label_cache = file_get_contents(self::MNIST_DATA_DIR . DS . self::MNIST_TEST_LABEL_FILE);
     }
 
-    static function getImageAt($image, $index) {
+    static function getImageAt($image, $index, $normalize = true) {
         // ヘッダー解析
         $header = unpack('N4', $image);
         $magic = $header[1];
@@ -72,7 +72,11 @@ class Util {
 
         $pixels = $numRow * $numCol;
         $start = 4 * 4 + $pixels * $index;
-        return array_values(unpack("C{$pixels}", substr($image, $start, $pixels)));
+        $result = array_values(unpack("C{$pixels}", substr($image, $start, $pixels)));
+        if ($normalize) {
+            $result = array_map(function($pixel) { return $pixel / 255.0;}, $result);
+        }
+        return $result;
     }
 
     static function getLabelAt($label, $index, $onehot = true) {
@@ -206,10 +210,11 @@ class Matrix {
         $str = '';
         list($r, $c) = $this->shape();
         for ($i = 0; $i < $r; $i++) {
+            $row = [];
             for ($j = 0; $j < $c; $j++) {
-                $str .= '  ' . $this->row[$i][$j];
+                $row[] =  sprintf("%.3e", $this->row[$i][$j]);
             }
-            $str .= "\n";
+            $str .=  implode("\t", $row) . "\n";
         }
         return $str;
     }
@@ -431,9 +436,9 @@ class Sigmoid implements Layer {
 
 class Affine implements Layer {
 
-    public function __construct(Matrix $W, Matrix $b) {
-        $this->W = $W;
-        $this->b = $b;
+    public function __construct(Matrix &$W, Matrix &$b) {
+        $this->W =& $W;
+        $this->b =& $b;
         $this->x = null;
         $this->dW = null;
         $this->db = null;
@@ -506,7 +511,7 @@ class SoftmaxWithLoss implements Layer {
         $t_logy = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j] + 1E-7);
+                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j]);
             }
         }
         $result = 0;
@@ -667,5 +672,4 @@ function main() {
         $trainLossList[] = $loss;
     }
 }
-
 main();
