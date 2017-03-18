@@ -1,2 +1,2 @@
 test:
-	php -d extension=./test.so phpunit.phar --color tests
+	php -d extension=./matrix.so phpunit.phar --color tests

@@ -1,7 +1,7 @@
 <?php
 use PHPUnit\Framework\TestCase;
 
-require_once __DIR__ . '/../index.php';
+//require_once __DIR__ . '/../index.php';
 
 class MatrixTest extends TestCase
 {
@@ -13,7 +13,7 @@ class MatrixTest extends TestCase
             [0, 0, 0, 0],
             [0, 0, 0, 0],
         ];
-        $this->assertEquals($expected, $m->row);
+        $this->assertEquals($expected, $m->toArray());
     }
 
     public function test_createFromData() {
@@ -22,7 +22,7 @@ class MatrixTest extends TestCase
             [4, 5, 6]
         ];
         $m = Matrix::createFromData($data);
-        $this->assertEquals($data, $m->row);
+        $this->assertEquals($data, $m->toArray());
     }
 
     public function test_zerosLike() {
@@ -35,7 +35,7 @@ class MatrixTest extends TestCase
             [0, 0, 0],
             [0, 0, 0],
         ];
-        $this->assertEquals($expected, $zeros->row);
+        $this->assertEquals($expected, $zeros->toArray());
     }
 
     public function test_onesLike() {
@@ -48,7 +48,7 @@ class MatrixTest extends TestCase
             [1, 1, 1],
             [1, 1, 1],
         ];
-        $this->assertEquals($expected, $ones->row);
+        $this->assertEquals($expected, $ones->toArray());
     }
 
     public function test_shape() {
@@ -67,7 +67,7 @@ class MatrixTest extends TestCase
             [1 * 2 + 2 * 3 + 3 * 5, 1 * 3 + 2 * 4 + 3 * 6],
             [4 * 2 + 5 * 3 + 6 * 5, 4 * 3 + 5 * 4 + 6 * 6],
         ];
-        $this->assertEquals($expected, $m1->mul($m2)->row);
+        $this->assertEquals($expected, $m1->mul($m2)->toArray());
     }
 
     public function test_componentwise_prod() {
@@ -77,7 +77,7 @@ class MatrixTest extends TestCase
             [1 * 2, 2 * 3, 3 * 4],
             [4 * 5, 5 * 6, 6 * 7],
         ];
-        $this->assertEquals($expected, $m1->componentwise_prod($m2)->row);
+        $this->assertEquals($expected, $m1->componentwiseProd($m2)->toArray());
     }
 
     public function test_plus() {
@@ -87,7 +87,7 @@ class MatrixTest extends TestCase
             [1 + 2, 2 + 3, 3 + 4],
             [4 + 5, 5 + 6, 6 + 7],
         ];
-        $this->assertEquals($expected, $m1->plus($m2)->row);
+        $this->assertEquals($expected, $m1->plus($m2)->toArray());
 
         $b = Matrix::createFromData([[10, 11, 12]]);
 
@@ -95,7 +95,7 @@ class MatrixTest extends TestCase
             [1 + 10, 2 + 11, 3 + 12],
             [4 + 10, 5 + 11, 6 + 12],
         ];
-        $this->assertEquals($expected, $m1->plus($b)->row);
+        $this->assertEquals($expected, $m1->plus($b)->toArray());
     }
 
     public function test_scale() {
@@ -105,7 +105,7 @@ class MatrixTest extends TestCase
             [5, 10, 15],
             [20, 25, 30],
         ];
-        $this->assertEquals($expected, $m1->scale($scale)->row);
+        $this->assertEquals($expected, $m1->scale($scale)->toArray());
     }
 
     public function test_minus() {
@@ -115,7 +115,7 @@ class MatrixTest extends TestCase
             [-1, -1, -1],
             [-1, -1, -1],
         ];
-        $this->assertEquals($expected, $m1->minus($m2)->row);
+        $this->assertEquals($expected, $m1->minus($m2)->toArray());
     }
 
     public function test_transpose() {
@@ -125,7 +125,7 @@ class MatrixTest extends TestCase
             [2, 5],
             [3, 6],
         ];
-        $this->assertEquals($expected, $m1->transpose()->row);
+        $this->assertEquals($expected, $m1->transpose()->toArray());
     }
 
     public function test_argmax() {
@@ -133,13 +133,13 @@ class MatrixTest extends TestCase
         $expected = [
             [1, 1, 1]
         ];
-        $this->assertEquals($expected, Matrix::argmax($m1)->row);
+        $this->assertEquals($expected, $m1->argmax(0)->toArray());
 
         $expected = [
             [2],
             [2],
         ];
-        $this->assertEquals($expected, Matrix::argmax($m1, 1)->row);
+        $this->assertEquals($expected, $m1->argmax(1)->toArray());
     }
 
     public function test_sumCol() {
@@ -152,7 +152,7 @@ class MatrixTest extends TestCase
             [15],
         ];
         $sumCol = $m->sumCol();
-        $this->assertEquals($expected, $sumCol->row);
+        $this->assertEquals($expected, $sumCol->toArray());
     }
 
     public function test_sumRow() {
@@ -164,7 +164,7 @@ class MatrixTest extends TestCase
             [5, 7, 9],
         ];
         $sumRow = $m->sumRow();
-        $this->assertEquals($expected, $sumRow->row);
+        $this->assertEquals($expected, $sumRow->toArray());
     }
 
 }

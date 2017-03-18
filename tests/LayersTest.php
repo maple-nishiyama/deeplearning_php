@@ -12,13 +12,13 @@ class LayersTest extends TestCase
             [-2.0, -1.0, 0.0, 1.0, 2.0,]
         ]);
         $out = $relu->forward($x);
-        $this->assertEquals([[0.0, 0.0, 0.0, 1.0, 2.0]], $out->row);
+        $this->assertEquals([[0.0, 0.0, 0.0, 1.0, 2.0]], $out->toArray());
 
         $dout = Matrix::createFromData([
             [1, 2, 3, 4, 5]
         ]);
         $back = $relu->backward($dout);
-        $this->assertEquals([[0.0, 0.0, 0.0, 4.0, 5.0]], $back->row);
+        $this->assertEquals([[0.0, 0.0, 0.0, 4.0, 5.0]], $back->toArray());
     }
 
     public function test_softmax() {
@@ -30,7 +30,7 @@ class LayersTest extends TestCase
             [exp(1) / (exp(1) + exp(2)), exp(2) / (exp(1) + exp(2))],
             [exp(3) / (exp(3) + exp(4)), exp(4) / (exp(3) + exp(4))],
         ];
-        $this->assertEquals($expected, SoftmaxWithLoss::softmax($m)->row);
+        $this->assertEquals($expected, SoftmaxWithLoss::softmax($m)->toArray());
     }
 
     public function test_cross_entropy_error() {
@@ -74,7 +74,7 @@ class LayersTest extends TestCase
             [29, 46, 63],
             [39, 60, 81],
         ];
-        $this->assertEquals($expected, $affine->forward($x)->row);
+        $this->assertEquals($expected, $affine->forward($x)->toArray());
     }
 
     public function test_SoftmaxWithLoss() {

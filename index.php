@@ -127,9 +127,7 @@ class Util {
     }
 
     static function toMatrix($data) {
-        $m = new Matrix(0, 0);
-        $m->row = $data;
-        return $m;
+        return Matrix::createFromData($data);
     }
 
     static function drawImage($pixels, $width, $height) {
@@ -173,195 +171,18 @@ class Util {
         }
         return $result;
     }
-}
-
-class Matrix {
-
-    public $row = null;
-
-    public function __construct($numRow = 0, $numCol = 0) {
-        $this->row = [];
-        for ($i = 0; $i < $numRow; $i++) {
-            $this->row[$i] = array_fill(0, $numCol, 0);
-        }
-    }
-
-    public static function createFromData(array $data) {
-        $m = new Matrix();
-        $m->row = $data;
-        return $m;
-    }
-
-    public static function zerosLike(Matrix $m) {
-        list($r, $c) = $m->shape();
-        return new Matrix($r, $c);
-    }
-
-    public static function onesLike(Matrix $m) {
-        list($r, $c) = $m->shape();
-        $data = [];
-        for ($i = 0; $i < $r; $i++) {
-            $data[$i] = array_fill(0, $c, 1);
-        }
-        return self::createFromData($data);
-    }
-
-    public function __toString() {
-        $str = '';
-        list($r, $c) = $this->shape();
-        for ($i = 0; $i < $r; $i++) {
-            $row = [];
-            for ($j = 0; $j < $c; $j++) {
-                $row[] =  sprintf("%.3e", $this->row[$i][$j]);
-            }
-            $str .=  implode("\t", $row) . "\n";
-        }
-        return $str;
-    }
-
-    public function shape() {
-        return [count($this->row), count($this->row[0])];
-    }
-
-    public function mul(Matrix $m) {
-        list($r1, $c1) = $this->shape();
-        list($r2, $c2) = $m->shape();
-        if($c1 !== $r2) {
-            throw new InvalidArgumentException("行列の型が違う");
-        }
-        $result = new Matrix(0, 0);
-        // native extension を呼び出して行列の積を計算する
-        $result->row = test_my_matrix_product($this->row, $m->row);
-        return $result;
-    }
 
     /**
-     * 成分ごとの積
-     *
-     * @param Matrix $m
+     * Matrix の成分をランダム値にする
      */
-    public function componentwise_prod(Matrix $m) {
-        list($r1, $c1) = $this->shape();
-        list($r2, $c2) = $m->shape();
-        if ($r1 != $r2 || $c1 != $c2) {
-            throw new InvalidArgumentException("成分ごとの積：行列の型が違う");
-        }
-        $result = new Matrix($r1, $c1);
-        for ($i = 0; $i < $r1; $i++) {
-            for ($j = 0; $j < $c1; $j++) {
-                $result->row[$i][$j] = $this->row[$i][$j] * $m->row[$i][$j];
-            }
-        }
-        return $result;
-    }
-
-    public function plus(Matrix $m) {
-        $s1 = $this->shape();
-        $s2 = $m->shape();
-        if ($s1 != $s2) {
-            if ($s2[0] === 1) {
-                // ブロードキャストを試みる
-                $m_ = new Matrix($s1[0], $s1[1]);
-                for ($i = 0; $i < $s1[0]; $i++) {
-                    $m_->row[$i] = $m->row[0];
-                }
-                $m = $m_;
-            } else {
-                throw new InvalidArgumentException("行列の型が違う");
-            }
-        }
-        $r = $s1[0];
-        $c = $s1[1];
-        $result = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = $this->row[$i][$j] + $m->row[$i][$j];
-            }
-        }
-        return $result;
-    }
-
-    public function scale($a) {
-        list($r, $c) = $this->shape();
-        $result = new Matrix($r, $c);
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] =  $a * $this->row[$i][$j];
-            }
-        }
-        return $result;
-    }
-
-    public function minus(Matrix $m) {
-        return $this->plus($m->scale(-1));
-    }
-
-    public function transpose() {
-        list($r, $c) = $this->shape();
-        $result = new Matrix($c, $r);
-        for ($i = 0; $i < $c; $i++) {
-            for ($j = 0; $j < $r; $j++) {
-                $result->row[$i][$j] = $this->row[$j][$i];
-            }
-        }
-        return $result;
-    }
-
-    public function randomize() {
-        list($r, $c) = $this->shape();
-        for ($i = 0; $i < $r; $i++) {
-            for ($j = 0; $j < $c; $j++) {
-                $this->row[$i][$j] = mt_rand(0, 1E4) / 3E6;
-            }
-        }
-        return $this;
-    }
-
-    public static function argmax(Matrix $m, $dir = 0) {
+    public static function randomize(Matrix $m) {
         list($r, $c) = $m->shape();
-        if ($dir == 0) {
-            $result = new Matrix(1, $c);
-            $tr = $m->transpose();
-            for ($i = 0; $i < $c; $i++) {
-                $max = max($tr->row[$i]);
-                $result->row[0][$i] = array_keys($tr->row[$i], $max)[0];
-            }
-        } else {
-            $result = new Matrix($r, 1);
-            for ($i = 0; $i < $r; $i++) {
-                $max = max($m->row[$i]);
-                $result->row[$i][0] = array_keys($m->row[$i], $max)[0];
-            }
-        }
-        return $result;
-    }
-
-    /*
-     * 列方向に和を取る
-     */
-    public function sumCol() {
-        $r = $this->shape()[0];
-        $sum = new Matrix($r, 1);
         for ($i = 0; $i < $r; $i++) {
-            $sum->row[$i] = [array_sum($this->row[$i])];
-        }
-        return $sum;
-    }
-
-    /*
-     * 行方向に和を取る
-     */
-    public function sumRow() {
-        list($r, $c) = $this->shape();
-        $sum = new Matrix(1, $c);
-        for ($j = 0; $j < $c; $j++) {
-            $s = 0;
-            for ($i = 0; $i < $r; $i++) {
-                $s += $this->row[$i][$j];
+            for ($j = 0; $j < $c; $j++) {
+                $m->set($i, $j, mt_rand(0, 1E4) / 3E6);
             }
-            $sum->row[0][$j] = $s;
         }
-        return $sum;
+        return $m;
     }
 }
 
@@ -384,7 +205,8 @@ class Relu implements Layer {
         $result = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = $x->row[$i][$j] > 0 ? $x->row[$i][$j] : 0;
+                $val = $x->get($i, $j) > 0 ? $x->get($i, $j) : 0;
+                $result->set($i, $j, $val);
             }
         }
         return $result;
@@ -395,7 +217,8 @@ class Relu implements Layer {
         $result = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = $this->x->row[$i][$j] > 0 ? $dout->row[$i][$j] : 0;
+                $val = $this->x->get($i, $j) > 0 ? $dout->get($i, $j) : 0;
+                $result->set($i, $j, $val);
             }
         }
         return $result;
@@ -427,7 +250,8 @@ class Sigmoid implements Layer {
         $result = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = 1 / (1 + exp($m->row[$i][$j]));
+                $val = 1 / (1 + exp($m->get($i, $j)));
+                $result->set($i, $j, $val);
             }
         }
         return $result;
@@ -487,19 +311,19 @@ class SoftmaxWithLoss implements Layer {
         $max = 0;
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $max = max($max, $m->row[$i][$j]);
+                $max = max($max, $m->get($i, $j));
             }
         }
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $exp->row[$i][$j] = exp($m->row[$i][$j] - $max);
+                $exp->set($i, $j, exp($m->get($i, $j) - $max));
             }
         }
         $result = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
-            $sum = array_sum($exp->row[$i]);
+            $sum = array_sum($exp->toArray()[$i]);
             for ($j = 0; $j < $c; $j++) {
-                $result->row[$i][$j] = $exp->row[$i][$j] / $sum;
+                $result->set($i, $j, $exp->get($i, $j) / $sum);
             }
         }
         return $result;
@@ -511,12 +335,13 @@ class SoftmaxWithLoss implements Layer {
         $t_logy = new Matrix($r, $c);
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $t_logy->row[$i][$j] = $t->row[$i][$j] * log($y->row[$i][$j]);
+                $val = $t->get($i, $j) * log($y->get($i, $j));
+                $t_logy->set($i, $j, $val);
             }
         }
         $result = 0;
         for ($i = 0; $i < $r; $i++) {
-            $result += -1 * array_sum($t_logy->row[$i]);
+            $result += -1 * array_sum($t_logy->toArray()[$i]);
         }
         $result /= $batchSize;
         return $result;
@@ -532,9 +357,9 @@ class TwoLayerNeuralNet {
 
     public function __construct($inputSize, $hiddenSize, $outputSize, $weightInitStd=0.01) {
         $this->params = [];
-        $this->params['W1'] = (new Matrix($inputSize, $hiddenSize))->randomize();
+        $this->params['W1'] = Util::randomize(new Matrix($inputSize, $hiddenSize));
         $this->params['b1'] = new Matrix(1, $hiddenSize);
-        $this->params['W2'] = (new Matrix($hiddenSize, $outputSize))->randomize();
+        $this->params['W2'] = Util::randomize(new Matrix($hiddenSize, $outputSize));
         $this->params['b2'] = new Matrix(1, $outputSize);
 
         // レイヤーの生成
@@ -594,16 +419,16 @@ class TwoLayerNeuralNet {
 
         for ($i = 0; $i < $r; $i++) {
             for ($j = 0; $j < $c; $j++) {
-                $tmpVal = $x->row[$i][$j];
+                $tmpVal = $x->get($i, $j);
 
-                $x->row[$i][$j] = $tmpVal + $h;
+                $x->set($i, $j, $tmpVal + $h);
                 $fxh1 = $f($x);
 
-                $x->row[$i][$j] = $tmpVal - $h;
+                $x->set($i, $j, $tmpVal - $h);
                 $fxh2 = $f($x);
 
-                $grad->row[$i][$j] = ($fxh1 - $fxh2) / (2 * $h);
-                $x->row[$i][$j] = $tmpVal;
+                $grad->set($i, $j, ($fxh1 - $fxh2) / (2 * $h));
+                $x->set($i, $j, $tmpVal);
             }
         }
 
@@ -617,7 +442,7 @@ class TwoLayerNeuralNet {
         $this->loss($x, $t);
 
         $dout = new Matrix(1, 1);
-        $dout->row[0][0] = 1;
+        $dout->set(0, 0, 1);
         $dout = $this->lastLayer->backward($dout);
 
         $reversedLayers = array_reverse($this->layers);
