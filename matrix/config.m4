@@ -57,7 +57,19 @@ if test "$PHP_MATRIX" != "no"; then
   dnl   -L$MATRIX_DIR/$PHP_LIBDIR -lm
   dnl ])
   dnl
-  dnl PHP_SUBST(MATRIX_SHARED_LIBADD)
+  dnl
+  PHP_SUBST(MATRIX_SHARED_LIBADD)
 
   PHP_NEW_EXTENSION(matrix, matrix.c, $ext_shared,, -DZEND_ENABLE_STATIC_TSRMLS_CACHE=1)
+
+  BLAS_LIBS=/Users/nishiyama/src/libopenblas/lib
+  BLAS_INCLUDES=/Users/nishiyama/src/libopenblas/include
+
+  LIBS="$LDFLAGS $BLAS_LIBS"
+  PHP_ADD_INCLUDE($BLAS_INCLUDES)
+
+  dnl INCLUDES="$CFLAGS $BLAS_INCLUDES"
+
+  dnl PHP_EVAL_INCLINE($INCLUDES)
+  PHP_EVAL_LIBLINE($LIBS)
 fi

@@ -27,6 +27,7 @@
 #include "ext/standard/info.h"
 #include "php_matrix.h"
 #include "pthread.h"
+#include "cblas.h"
 
 /* If you declare any globals in php_matrix.h uncomment this:
 ZEND_DECLARE_MODULE_GLOBALS(matrix)
@@ -231,13 +232,22 @@ PHP_METHOD(Matrix, mul) {
     }
     matrix = Z_MATRIX_OBJ_P(z_matrix);
 
-    long r = self->numRows;
-    long c1 = self->numCols;
-    long c2 = matrix->numCols;
+    int r1 = (int)self->numRows;
+    int c1 = (int)self->numCols;
+    int r2 = (int)matrix->numRows;
+    int c2 = (int)matrix->numCols;
 
     // 結果の matrix を作成
-    php_matrix* result = init_return_value(return_value, r, c2);
+    php_matrix* result = init_return_value(return_value, r1, c2);
 
+    cblas_dgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            r1, c2, c1,
+            1.0,
+            self->data, c1,
+            matrix->data, c2,
+            0.0,
+            result->data, c2);
+    /*
     if (r >= 64) {
         pthread_t threads[NUM_THREAD];
         struct matrix_params params[NUM_THREAD];
@@ -267,6 +277,7 @@ PHP_METHOD(Matrix, mul) {
             }
         }
     }
+     */
 }
 
 PHP_METHOD(Matrix, componentwiseProd) {
