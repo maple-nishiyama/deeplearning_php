@@ -468,6 +468,7 @@ PHP_METHOD(Matrix, argmax) {
             for (long i = 0; i < r; ++i) {
                 if (self->data[i * c + j] > max) {
                     index = i;
+                    max = self->data[i * c + j];
                 }
             }
             result->data[j] = index;
@@ -480,6 +481,7 @@ PHP_METHOD(Matrix, argmax) {
             for (long j = 0; j < c; ++j) {
                 if (self->data[i * c + j] > max) {
                     index = j;
+                    max = self->data[i * c + j];
                 }
             }
             result->data[i] = index;

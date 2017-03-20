@@ -3,6 +3,14 @@ ini_set('memory_limit', '1G');
 
 define('DS', DIRECTORY_SEPARATOR);
 
+function dumpMatrix(Matrix $m, $filename) {
+    $out = '';
+    $a = $m->toArray();
+    foreach ($a as $row) {
+        $out .= implode(', ', array_map(function($e) { return sprintf("%.4f", $e); }, $row)) . "\n";
+    }
+    file_put_contents($filename, $out);
+}
 class Util {
 
     const MNIST_TRAIN_IMAGE_URL = 'http://yann.lecun.com/exdb/mnist/train-images-idx3-ubyte.gz';
@@ -382,18 +390,42 @@ class TwoLayerNeuralNet {
         return $this->lastLayer->forward($y, $t);
     }
 
-    public function accuracy(Matrix $x, Matrix $t) {
+    public function batchAccuracy(Matrix $x, Matrix $t) {
         $y = $this->predict($x);
-        $ymax = Matrix::argmax($y, $dir=1);
-        $tmax = Matrix::argmaax($t, $dir=1);
+        $ymax = $y->argmax($dir=1);
+        $tmax = $t->argmax($dir=1);
         $r = $y->shape()[0];
         $acc = 0;
         for ($i = 0; $i < $r; $i++) {
-            if ($ymax[$i] === $tmax[$i]) {
+            if ($ymax->get($i, 0) === $tmax->get($i, 0)) {
                 $acc += 1;
             }
         }
-        return $acc / $r;
+        return $acc;
+    }
+
+    public function trainAccuracy() {
+        $acc = 0;
+        $batchSize = 100;
+        $totalSize = 60000;
+        for ($i = 0; $i < $totalSize; $i += $batchSize) {
+            $mask = range($i, min($i + $batchSize, $totalSize - 1));
+            list($xTrain, $tTrain) = Util::getTrainBatch($mask);
+            $acc += $this->batchAccuracy($xTrain, $tTrain);
+        }
+        return $acc / $totalSize;
+    }
+
+    public function testAccuracy() {
+        $acc = 0;
+        $batchSize = 100;
+        $totalSize = 10000;
+        for ($i = 0; $i < $totalSize; $i += $batchSize) {
+            $mask = range($i, min($i + $batchSize, $totalSize - 1));
+            list($xTest, $tTest) = Util::getTestBatch($mask);
+            $acc += $this->batchAccuracy($xTest, $tTest);
+        }
+        return $acc / $totalSize;
     }
 
     // 数値微分
@@ -475,6 +507,10 @@ function main() {
     $learningRate = 0.1;
 
     $trainLossList = [];
+    $trainAccList = [];
+    $testAccList = [];
+
+    $iterPerEpoch = max($trainSize / $batchSize, 1);
 
     Util::loadData();
     $network = new TwoLayerNeuralNet($inputSize=784, $hiddenSize=50, $outputSize=10);
@@ -493,8 +529,15 @@ function main() {
 
         $loss = $network->loss($xBatch, $tBatch);
 
-        echo "(i, loss) = ($i, $loss)\n";
         $trainLossList[] = $loss;
+
+        if ($i % $iterPerEpoch == 0) {
+            $trainAcc = $network->trainAccuracy();
+            $testAcc = $network->testAccuracy();
+            $trainAccList[] = $trainAcc;
+            $testAccList[] = $testAccList;
+            echo "(trainAcc, testAcc) = ($trainAcc, $testAcc)\n";
+        }
     }
 }
 main();

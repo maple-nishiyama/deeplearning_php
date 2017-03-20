@@ -129,9 +129,9 @@ class MatrixTest extends TestCase
     }
 
     public function test_argmax() {
-        $m1 = Matrix::createFromData([[1, 2, 3], [4, 5, 6]]);
+        $m1 = Matrix::createFromData([[1, 2, 3, 2], [4, 5, 6, 1]]);
         $expected = [
-            [1, 1, 1]
+            [1, 1, 1, 0]
         ];
         $this->assertEquals($expected, $m1->argmax(0)->toArray());
 
